@@ -42,3 +42,8 @@ class MyWebsocketClientWorker(WebsocketClientWorker):
         except Exception as e:
             print(f"An error occurred during async_command: {str(e)}")
             return None
+
+    def command(self, command: dict):
+        return self._send_msg_and_deserialize(**command)
+
+

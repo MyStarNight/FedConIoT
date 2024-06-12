@@ -12,7 +12,7 @@ from syft.workers.abstract import AbstractWorker
 
 class MyWebsocketServerWorker(WebsocketServerWorker):
 
-    def __init__(self, hook, host: str, port: int, id, verbose, owner: AbstractWorker=None):
+    def __init__(self, hook, host: str, port: int, id, verbose, owner: AbstractWorker = None):
         super().__init__(hook=hook, host=host, port=port, id=id, verbose=verbose)
         self.owner = self.owner = owner if owner else sy.hook.local_worker
         self.child_nodes: Dict[MyWebsocketClientWorker] = []
@@ -48,8 +48,6 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
             response = self._send_msg(serialized_message, child_node)
             response_list.append(response)
 
-        return response_list
-
     @staticmethod
     def test():
         print("test start")
@@ -59,7 +57,7 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
     def model_initialization(self):
         self.model = ConvNet1D(input_size=400, num_classes=7)
         self.traced_model = torch.jit.trace(self.model, torch.zeros([1, 400, 3], dtype=torch.float))
-        return self.model, self.traced_model
+        # return self.model, self.traced_model
 
     def model_dissemination(self, forward_device_mapping_id: dict, port=9292):
         """

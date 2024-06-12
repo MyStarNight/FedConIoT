@@ -39,3 +39,9 @@ def get_host_ip():
     finally:
         s.close()
     return ip
+
+
+def generate_kwarg(ID):
+    ip = id_mapping_client_device[ID]
+    kwarg = {"host": ip, "port": 9292, "id": ID}
+    return kwarg
