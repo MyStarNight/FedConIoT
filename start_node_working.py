@@ -8,8 +8,8 @@ import syft as sy
 from syft.workers import websocket_server
 from collections import Counter
 
-from my_package.websocket_server import MyWebsocketServerWorker
-from my_package import my_utils
+from src.websocket_server import MyWebsocketServerWorker
+from src import my_utils
 import socket
 
 KEEP_LABELS_DICT = {
