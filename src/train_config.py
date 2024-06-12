@@ -42,3 +42,9 @@ class MyTrainConfig(TrainConfig):
         except Exception as e:
             print(f"An error occurred during async_wrap_and_send: {str(e)}")
             return None
+
+    def wrap_and_send(self, obj, location):
+        obj_with_id = ObjectWrapper(id=sy.ID_PROVIDER.pop(), obj=obj)
+        obj_ptr = self.owner.send(obj_with_id, location)
+        obj_id = obj_ptr.id_at_location
+        return obj_ptr, obj_id

@@ -28,6 +28,23 @@ class ConvNet1D(nn.Module):
 def loss_fn(pred, target):
     return F.cross_entropy(pred, target.argmax(dim=1))
 
+
 @torch.jit.script
 def loss_fn_test(pred, target):
     return F.cross_entropy(pred, target)
+
+
+def model_to_device(model, device='cpu'):
+    """由于在此环境下，模型进行计算以后无法在cpu和cuda之间切换
+    因此使用这个函数，进行模型的运算设备切换
+
+    Args:
+        model: 模型
+        device: cpu or cuda
+
+    Returns:
+        traced model to device you set
+    """
+    new_model = ConvNet1D(input_size=400, num_classes=7).to(device)
+    new_model.load_state_dict(model.state_dict())
+    return new_model

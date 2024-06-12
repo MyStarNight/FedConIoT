@@ -19,6 +19,13 @@ client_device_mapping_id = {
     # "192.168.3.17": "testing"
 }
 
+id_mapping_client_device = {value: key for key, value in client_device_mapping_id.items()}
+
+tree = {
+    1: [("AA", "BB"), ("AA", "CC")],
+    2: [("BB", "DD"), ("CC", "EE")]
+}
+
 
 def get_host_ip():
     """
