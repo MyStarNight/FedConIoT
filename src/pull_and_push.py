@@ -29,11 +29,8 @@ class MyTrainConfig(TrainConfig):
                 obj_with_id = ObjectWrapper(id=obj_id, obj=obj)
                 obj_message = ObjectMessage(obj_with_id)
                 bin_message = sy.serde.serialize(obj_message, worker=self.owner)
-                print(f"User-{location.id} sending start:{datetime.now()}")
                 await websocket.send(str(binascii.hexlify(bin_message)))
-                print(f"User-{location.id} sending end:{datetime.now()}")
                 await websocket.recv()
-                print(f"User-{location.id} receive:{datetime.now()}")
 
             location.connect()
 
@@ -44,6 +41,17 @@ class MyTrainConfig(TrainConfig):
             return None
 
     def wrap_and_send(self, obj, location):
+        obj_with_id = ObjectWrapper(id=sy.ID_PROVIDER.pop(), obj=obj)
+        obj_ptr = self.owner.send(obj_with_id, location)
+        obj_id = obj_ptr.id_at_location
+        return obj_ptr, obj_id
+
+
+class PullAndPush:
+    def __init__(self):
+        self.owner = sy.hook.local_worker
+
+    def send(self, obj, location):
         obj_with_id = ObjectWrapper(id=sy.ID_PROVIDER.pop(), obj=obj)
         obj_ptr = self.owner.send(obj_with_id, location)
         obj_id = obj_ptr.id_at_location

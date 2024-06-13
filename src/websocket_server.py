@@ -6,8 +6,13 @@ import syft as sy
 from src.nn_model import ConvNet1D, loss_fn, model_to_device
 from src import my_utils
 from typing import Dict
-from src.train_config import MyTrainConfig
+from src.pull_and_push import MyTrainConfig
 from syft.workers.abstract import AbstractWorker
+from syft.generic.pointers.object_wrapper import ObjectWrapper
+from datetime import datetime
+from src.config import config
+from src.pull_and_push import PullAndPush
+from syft.frameworks.torch.fl import utils
 
 
 class MyWebsocketServerWorker(WebsocketServerWorker):
@@ -20,10 +25,10 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         # 训练部分的参数
         self.model = None
         self.traced_model = None
-        self.loss_fn = loss_fn
-        self.batch_size = 32
-        self.learning_rate = 0.001
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.config = config
+        self.p_p = PullAndPush()
+        self.train_state = False
 
     def connect_child_nodes(self, forward_device_mapping_id: dict, port=9292):
         for ip, ID in forward_device_mapping_id.items():
@@ -57,7 +62,8 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
     def model_initialization(self):
         self.model = ConvNet1D(input_size=400, num_classes=7)
         self.traced_model = torch.jit.trace(self.model, torch.zeros([1, 400, 3], dtype=torch.float))
-        # return self.model, self.traced_model
+        self.model.to(self.device)
+        self.train_state = True
 
     def model_dissemination(self, forward_device_mapping_id: dict, port=9292):
         """
@@ -70,60 +76,54 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         self.connect_child_nodes(forward_device_mapping_id, port)
 
         # 发送模型给所有的子节点
-        train_config = MyTrainConfig(
-            model=self.model,
-            loss_fn=self.loss_fn,
-            batch_size=self.batch_size,
-            shuffle=True,
-            # max_nr_batches=max_nr_batches,
-            epochs=1,
-            optimizer="SGD",
-            optimizer_args={"lr": self.learning_rate},
-        )
         for child_node in self.child_nodes:
-            train_config.send(child_node)
+            if self.traced_model is not None:
+                obj_ptr, obj_id = self.p_p.send(self.traced_model, child_node)
+                child_node.command({
+                    "command_name": "model_configuration",
+                    "model_id": obj_id
+                })
+            else:
+                raise ValueError("Traced Model is None")
 
         # 关闭所有节点的连接
         self.close_child_nodes()
 
-    def model_collection(self, forward_device_mapping_id: dict, port=9292, model_id=int(str('1' * 11))):
-        # 连接所有子节点
-        self.connect_child_nodes(forward_device_mapping_id, port)
+    def model_configuration(self, model_id):
+        self.traced_model = self.get_obj(model_id).obj
+        self.model = model_to_device(self.traced_model, self.device)
+        self.train_state = True
 
-        # 收回所有模型
-        for child_node in self.child_nodes:
-            self.owner.request_obj(model_id, child_node)
-
-        # 关闭所有节点的连接
-        self.close_child_nodes()
+    def check_train_state(self):
+        if self.train_state is not True:
+            raise ValueError("Train State is False")
 
     def train(self, dataset_key: str):
 
-        self._check_train_config()
+        # 检测是否可以进行训练
+        self.check_train_state()
         print(f'{self.device} is available.')
-
         if dataset_key not in self.datasets:
             raise ValueError(f"Dataset {dataset_key} unknown.")
 
-        traced_model = self.get_obj(self.train_config._model_id).obj
-        self.model = model_to_device(traced_model, self.device)
-        loss_fn = self.get_obj(self.train_config._loss_fn_id).obj
-
+        # 为训练做准备
         self._build_optimizer(
-            self.train_config.optimizer, self.model, optimizer_args=self.train_config.optimizer_args
+            self.config["optimizer"],
+            self.model,
+            optimizer_args=self.config['optimizer_args']
         )
-
-        return self._train(dataset_key, loss_fn)
-
-    def _train(self, dataset_key, loss_fn, model_id=int(str('1' * 11))):
+        model_id = int(str('1' * 11))
 
         self.model.train()
         data_loader = self._create_data_loader(
-            dataset_key=dataset_key, shuffle=self.train_config.shuffle
+            dataset_key=dataset_key, shuffle=self.config["shuffle"]
         )
 
         loss = None
         iteration_count = 0
+
+        print(f"{datetime.now()}: Training Start")
+        print(next(self.model.parameters()).device)
 
         for _ in range(self.train_config.epochs):
             for (data, target) in data_loader:
@@ -141,6 +141,8 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
                 if iteration_count >= self.train_config.max_nr_batches >= 0:
                     break
 
+        print(f"{datetime.now()}: Training End")
+
         self.model.eval()
         self.model = model_to_device(self.model, 'cpu')
         self.traced_model = torch.jit.trace(
@@ -148,6 +150,21 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
             torch.zeros([1, 400, 3], dtype=torch.float).to('cpu')
         )
 
-        self.register_obj(obj=self.traced_model, obj_id=model_id)
+        self.register_obj(ObjectWrapper(id=model_id, obj=self.traced_model))
+        self.train_state = False
 
-        return loss.to('cpu')
+    def model_collection(self, forward_device_mapping_id: dict, port=9292, model_id=int(str('1' * 11))):
+        # 连接所有子节点
+        self.connect_child_nodes(forward_device_mapping_id, port)
+
+        # 收回所有模型
+        model_dict = {"me": self.traced_model}
+        for child_node in self.child_nodes:
+            model_dict[child_node.id] = self.owner.request_obj(model_id, child_node)
+
+        # 聚合模型
+        self.traced_model = utils.federated_avg(model_dict)
+        self.model = model_to_device(self.traced_model, self.device)
+
+        # 关闭所有节点的连接
+        self.close_child_nodes()
