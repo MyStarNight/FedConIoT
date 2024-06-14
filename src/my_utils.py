@@ -45,3 +45,30 @@ def generate_kwarg(ID):
     ip = id_mapping_client_device[ID]
     kwarg = {"host": ip, "port": 9292, "id": ID}
     return kwarg
+
+
+def device_id_to_model_id(ID: str):
+    appendix = None
+    if len(ID) == 1:
+        appendix = '0' + str(ord(ID) - ord('A') + 1)
+    elif len(ID) == 2 and ID[0] == ID[1]:
+        appendix = '1' + str(ord(ID[0]) - ord('A') + 1)
+
+    return int(str('1'*9)+appendix)
+
+
+def model_id_to_device_id(model_id: int):
+    info = int(str(model_id)[-2:])
+    if info > 10:
+        info = info - 10 - 1
+        model_id = chr(65+info)*2
+    elif info <= 10:
+        info = info - 1
+        model_id = chr(65+info)
+
+    return model_id
+
+
+def generate_command_dict(command_name, **kwargs):
+    kwargs['command_name'] = command_name
+    return kwargs

@@ -51,8 +51,10 @@ class PullAndPush:
     def __init__(self):
         self.owner = sy.hook.local_worker
 
-    def send(self, obj, location):
-        obj_with_id = ObjectWrapper(id=sy.ID_PROVIDER.pop(), obj=obj)
+    def send(self, obj, location, ID=None):
+        if ID is None:
+            ID = sy.ID_PROVIDER.pop()
+        obj_with_id = ObjectWrapper(id=ID, obj=obj)
         obj_ptr = self.owner.send(obj_with_id, location)
         obj_id = obj_ptr.id_at_location
         return obj_ptr, obj_id
