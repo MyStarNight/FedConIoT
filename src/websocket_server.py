@@ -98,6 +98,9 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         self.model = model_to_device(self.traced_model, self.device)
         self.train_state = True
 
+    def change_state(self, state=True):
+        self.train_state = state
+
     def check_train_state(self):
         if self.train_state is not True:
             raise ValueError("Train State is False")
