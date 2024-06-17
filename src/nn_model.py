@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import copy
 
 
 class ConvNet1D(nn.Module):
@@ -48,3 +49,49 @@ def model_to_device(model, device='cpu'):
     new_model = ConvNet1D(input_size=400, num_classes=7).to(device)
     new_model.load_state_dict(model.state_dict())
     return new_model
+
+
+def aggregate_models(model_dict, sample_dict):
+    """
+    Aggregate models using custom weights based on the sample counts.
+    This function supports both nn.Module and torch.jit.ScriptModule.
+
+    Parameters:
+    model_dict (dict): A dictionary containing the models to be aggregated with format {id: model}.
+    sample_dict (dict): A dictionary containing the sample counts with format {id: sample_count}.
+
+    Returns:
+    aggregated_model: The aggregated model.
+    """
+
+    # Determine the total number of samples
+    total_samples = sum(sample_dict.values())
+
+    # Initialize the aggregated model state dict with the first model's state dict
+    first_model_id = next(iter(model_dict))
+    first_model = model_dict[first_model_id]
+
+    if isinstance(first_model, torch.jit.ScriptModule):
+        # For ScriptModule, we need to recompile the module structure
+        aggregated_model = torch.jit.script(first_model)
+        aggregated_model_state_dict = {k: torch.zeros_like(v) for k, v in first_model.state_dict().items()}
+    else:
+        # For nn.Module, we can use deepcopy
+        aggregated_model = copy.deepcopy(first_model)
+        aggregated_model_state_dict = {k: torch.zeros_like(v) for k, v in aggregated_model.state_dict().items()}
+
+    # Aggregate the models
+    for model_id, model in model_dict.items():
+        weight = sample_dict[model_id] / total_samples
+        model_state_dict = model.state_dict()
+
+        for key in aggregated_model_state_dict.keys():
+            aggregated_model_state_dict[key] += weight * model_state_dict[key]
+
+    # Load the aggregated state dict into the aggregated model
+    if isinstance(aggregated_model, torch.jit.ScriptModule):
+        aggregated_model = torch.jit.script(aggregated_model)
+
+    aggregated_model.load_state_dict(aggregated_model_state_dict)
+
+    return aggregated_model

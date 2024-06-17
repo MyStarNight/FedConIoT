@@ -122,7 +122,7 @@ if __name__ == '__main__':
 
     elif operation == 'send_file':
         # 要发送的目标文件
-        local_file = r"E:\2024mem\AI-project\FedConIoT\src\websocket_server.py"
+        local_file = r"E:\2024mem\AI-project\FedConIoT\src\nn_model.py"
         remote_folder = "/home/hao/work/fl-pj/FedConIoT/src"
 
         # 发送文件

@@ -111,7 +111,12 @@ async def main():
 
         push_time.append((datetime.now() - start).total_seconds())
 
+        if cur_round % 5 == 0 or cur_round == train_config.training_rounds:
+            all_nodes['AA'].connect()
+
+
     return pull_time, train_time, push_time
+
 
 if __name__ == '__main__':
     LOG_INTERVAL = 25

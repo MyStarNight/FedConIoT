@@ -106,8 +106,6 @@ def start_node_working(id, host, port, hook, verbose, n_samples, keep_users=None
     return server
 
 
-
-
 if __name__ == '__main__':
     FORMAT = "%(asctime)s | %(message)s"
     logging.basicConfig(format=FORMAT)

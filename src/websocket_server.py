@@ -3,7 +3,7 @@ import time
 import torch
 from src.websocket_client import MyWebsocketClientWorker
 import syft as sy
-from src.nn_model import ConvNet1D, loss_fn, model_to_device
+from src.nn_model import ConvNet1D, loss_fn, model_to_device, aggregate_models, loss_fn_test
 from src import my_utils
 from typing import Dict, List
 from src.pull_and_push import MyTrainConfig
@@ -13,6 +13,7 @@ from datetime import datetime
 from src.config import Config
 from src.pull_and_push import PullAndPush
 from syft.frameworks.torch.fl import utils
+import numpy as np
 
 
 class MyWebsocketServerWorker(WebsocketServerWorker):
@@ -31,6 +32,16 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         self.train_state = False
         self.model_dict = {}
         self.model_id = my_utils.device_id_to_model_id(self.id)
+        self.sample_length = 0
+        self.sample_dict = {}
+
+    def add_dataset(self, dataset, key: str):
+        super().add_dataset(dataset, key)
+        self.sample_length = len(list(self.datasets.values())[0])
+        self.sample_dict = {self.id: self.sample_length}
+
+    def total_sample_length(self):
+        return np.sum(list(self.sample_dict.values()))
 
     def connect_child_nodes(self, forward_device_id: list, port=9292):
         for ID in forward_device_id:
@@ -151,7 +162,8 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         )
 
         self.train_state = False
-        self.model_dict = {}
+        self.model_dict = {self.id: self.traced_model}
+        self.sample_dict = {self.id: self.sample_length}
 
     def model_collection(self, forward_device_id: list, port=9292, aggregation=False):
         # 连接所有子节点
@@ -163,20 +175,50 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
             child_node.command({
                 "command_name": "model_storage_and_aggregation",
                 "model_id": obj_id,
-                "aggregation": aggregation
+                "aggregation": aggregation,
+                "sample_length": self.total_sample_length()
             })
 
         # 关闭所有节点的连接
         self.close_child_nodes()
 
-    def model_storage_and_aggregation(self, model_id, aggregation):
+    def model_storage_and_aggregation(self, model_id, aggregation, sample_length):
         device_id = my_utils.model_id_to_device_id(model_id)
         self.model_dict[device_id] = self.get_obj(model_id).obj
+        self.sample_dict[device_id] = sample_length
         self.de_register_obj(self.get_obj(model_id))
 
         if aggregation:
-            self.traced_model = utils.federated_avg(self.model_dict)
+            self.show_node_state()
+            self.traced_model = aggregate_models(self.model_dict, self.sample_dict)
             self.model = model_to_device(self.traced_model, self.device)
 
-    def show_stored_models(self):
+    def model_testing(self, dataset_key, save=False):
+        if dataset_key not in self.datasets:
+            raise ValueError(f"Dataset {dataset_key} unknown.")
+
+        model = list(self.model_dict.values())[-1]
+        model.eval()
+        data_loader = self._create_data_loader(dataset_key=dataset_key, shuffle=False)
+
+        test_loss = 0.0
+        correct = 0
+
+        with torch.no_grad():
+            for data, target in data_loader:
+                data, target = data, target
+                output = model(data)
+
+                loss = loss_fn_test(output, target)
+                test_loss += loss.item()
+
+                _, predicted = torch.max(output, 1)
+                correct += (predicted == target).sum().item()
+
+        test_loss = test_loss/len(data_loader.dataset)
+        accuracy = correct/len(data_loader.dataset)
+
+
+    def show_node_state(self):
         print(self.model_dict.keys())
+        print(self.sample_dict)
