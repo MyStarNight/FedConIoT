@@ -8,6 +8,7 @@ import torch
 from datetime import datetime
 import asyncio
 import logging
+from src.model_evaluation import evaluate
 
 
 async def send_command(commands, nodes):
@@ -21,7 +22,8 @@ async def send_command(commands, nodes):
 
 async def main():
     hook = sy.TorchHook(torch)
-    train_config = Config()
+    me = sy.hook.local_worker
+    train_config = Config(training_rounds=5)
 
     # 连接并测试所有节点
     all_nodes_id = ['AA', 'BB', 'CC', 'DD', 'EE']
@@ -111,9 +113,12 @@ async def main():
 
         push_time.append((datetime.now() - start).total_seconds())
 
-        if cur_round % 5 == 0 or cur_round == train_config.training_rounds:
+        if cur_round % 1 == 0 or cur_round == train_config.training_rounds:
             all_nodes['AA'].connect()
-
+            all_nodes['AA'].command(generate_command_dict(command_name="set_federated_model"))
+            model = me.request_obj(int(str(1)*11), all_nodes['AA']).obj
+            all_nodes['AA'].close()
+            evaluate(model)
 
     return pull_time, train_time, push_time
 

@@ -16,7 +16,7 @@ client_device_mapping_id = {
     # "192.168.3.12": "H",
     # "192.168.3.13": "I",
     # "192.168.3.20": "J",
-    "192.168.3.17": "testing"
+    # "192.168.3.25": "testing"
 }
 
 id_mapping_client_device = {value: key for key, value in client_device_mapping_id.items()}
@@ -48,13 +48,16 @@ def generate_kwarg(ID):
 
 
 def device_id_to_model_id(ID: str):
-    appendix = None
-    if len(ID) == 1:
-        appendix = '0' + str(ord(ID) - ord('A') + 1)
-    elif len(ID) == 2 and ID[0] == ID[1]:
-        appendix = '1' + str(ord(ID[0]) - ord('A') + 1)
+    if ID != "testing":
+        appendix = None
+        if len(ID) == 1:
+            appendix = '0' + str(ord(ID) - ord('A') + 1)
+        elif len(ID) == 2 and ID[0] == ID[1]:
+            appendix = '1' + str(ord(ID[0]) - ord('A') + 1)
 
-    return int(str('1'*9)+appendix)
+        return int(str('1'*9)+appendix)
+    else:
+        return None
 
 
 def model_id_to_device_id(model_id: int):

@@ -25,12 +25,12 @@ class ConvNet1D(nn.Module):
         return x
 
 
-@torch.jit.script
+# @torch.jit.script
 def loss_fn(pred, target):
     return F.cross_entropy(pred, target.argmax(dim=1))
 
 
-@torch.jit.script
+# @torch.jit.script
 def loss_fn_test(pred, target):
     return F.cross_entropy(pred, target)
 

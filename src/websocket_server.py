@@ -14,6 +14,7 @@ from src.config import Config
 from src.pull_and_push import PullAndPush
 from syft.frameworks.torch.fl import utils
 import numpy as np
+from src.model_evaluation import evaluate
 
 
 class MyWebsocketServerWorker(WebsocketServerWorker):
@@ -27,7 +28,7 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         self.model = None
         self.traced_model = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.train_config = Config()
+        self.train_config = Config(epochs=20, optimizer_args={'lr': 0.001})
         self.p_p = PullAndPush()
         self.train_state = False
         self.model_dict = {}
@@ -105,8 +106,8 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
 
     def model_configuration(self, model_id):
         self.traced_model = self.get_obj(model_id).obj
-        self.de_register_obj(self.get_obj(model_id))
         self.model = model_to_device(self.traced_model, self.device)
+        self.de_register_obj(self.get_obj(model_id))
         self.train_state = True
 
     def change_state(self, state=True):
@@ -120,7 +121,7 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
 
         # 检测是否可以进行训练
         self.check_train_state()
-        print(f'{self.device} is available.')
+        print(f'\n{self.device} is available.')
         if dataset_key not in self.datasets:
             raise ValueError(f"Dataset {dataset_key} unknown.")
 
@@ -152,14 +153,15 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
                 loss.backward()
                 self.optimizer.step()
 
-        print(f"{datetime.now()}: Training End")
-
         self.model.eval()
-        self.model = model_to_device(self.model, 'cpu')
         self.traced_model = torch.jit.trace(
-            self.model,
-            torch.zeros([1, 400, 3], dtype=torch.float).to('cpu')
+            model_to_device(self.model, 'cpu'),
+            torch.zeros([1, 400, 3], dtype=torch.float)
         )
+
+        evaluate(self.model, self.device)
+        print(loss.item())
+        print(f"{datetime.now()}: Training End")
 
         self.train_state = False
         self.model_dict = {self.id: self.traced_model}
@@ -189,35 +191,12 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         self.de_register_obj(self.get_obj(model_id))
 
         if aggregation:
-            self.show_node_state()
             self.traced_model = aggregate_models(self.model_dict, self.sample_dict)
             self.model = model_to_device(self.traced_model, self.device)
 
-    def model_testing(self, dataset_key, save=False):
-        if dataset_key not in self.datasets:
-            raise ValueError(f"Dataset {dataset_key} unknown.")
-
-        model = list(self.model_dict.values())[-1]
-        model.eval()
-        data_loader = self._create_data_loader(dataset_key=dataset_key, shuffle=False)
-
-        test_loss = 0.0
-        correct = 0
-
-        with torch.no_grad():
-            for data, target in data_loader:
-                data, target = data, target
-                output = model(data)
-
-                loss = loss_fn_test(output, target)
-                test_loss += loss.item()
-
-                _, predicted = torch.max(output, 1)
-                correct += (predicted == target).sum().item()
-
-        test_loss = test_loss/len(data_loader.dataset)
-        accuracy = correct/len(data_loader.dataset)
-
+    def set_federated_model(self, federated_model_id=int(str(1)*11)):
+        obj_with_id = ObjectWrapper(id=federated_model_id, obj=self.traced_model)
+        self.set_obj(obj_with_id)
 
     def show_node_state(self):
         print(self.model_dict.keys())
