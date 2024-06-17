@@ -25,7 +25,6 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         self.child_nodes: List[MyWebsocketClientWorker] = []
 
         # 训练部分的参数
-        self.model = None
         self.traced_model = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.train_config = Config(epochs=20, optimizer_args={'lr': 0.001})
@@ -75,9 +74,8 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         print("test end")
 
     def model_initialization(self):
-        self.model = ConvNet1D(input_size=400, num_classes=7)
-        self.traced_model = torch.jit.trace(self.model, torch.zeros([1, 400, 3], dtype=torch.float))
-        self.model.to(self.device)
+        model = ConvNet1D(input_size=400, num_classes=7)
+        self.traced_model = torch.jit.trace(model, torch.zeros([1, 400, 3], dtype=torch.float))
         self.train_state = True
 
     def model_dissemination(self, forward_device_id: list, port=9292):
@@ -106,7 +104,6 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
 
     def model_configuration(self, model_id):
         self.traced_model = self.get_obj(model_id).obj
-        self.model = model_to_device(self.traced_model, self.device)
         self.de_register_obj(self.get_obj(model_id))
         self.train_state = True
 
@@ -125,14 +122,15 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         if dataset_key not in self.datasets:
             raise ValueError(f"Dataset {dataset_key} unknown.")
 
+        model = model_to_device(self.traced_model, self.device)
+
         # 为训练做准备
-        self._build_optimizer(
-            self.train_config.optimizer,
-            self.model,
-            optimizer_args=self.train_config.optimizer_args
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            lr=self.train_config.lr
         )
 
-        self.model.train()
+        model.train()
         data_loader = self._create_data_loader(
             dataset_key=dataset_key, shuffle=self.train_config.shuffle
         )
@@ -145,27 +143,29 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         for _ in range(self.train_config.epochs):
             for (data, target) in data_loader:
                 # Set gradients to zero
-                self.optimizer.zero_grad()
+                optimizer.zero_grad()
 
                 # Update model
-                output = self.model(data.to(self.device))
+                output = model(data.to(self.device))
                 loss = loss_fn(target=target.to(self.device), pred=output)
                 loss.backward()
-                self.optimizer.step()
+                optimizer.step()
 
-        self.model.eval()
+        model.eval()
         self.traced_model = torch.jit.trace(
-            model_to_device(self.model, 'cpu'),
+            model_to_device(model, 'cpu'),
             torch.zeros([1, 400, 3], dtype=torch.float)
         )
 
-        evaluate(self.model, self.device)
+        evaluate(model, self.device)
         print(loss.item())
         print(f"{datetime.now()}: Training End")
 
         self.train_state = False
         self.model_dict = {self.id: self.traced_model}
         self.sample_dict = {self.id: self.sample_length}
+
+        torch.save(model.state_dict(), 'model.pth')
 
     def model_collection(self, forward_device_id: list, port=9292, aggregation=False):
         # 连接所有子节点
@@ -192,7 +192,6 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
 
         if aggregation:
             self.traced_model = aggregate_models(self.model_dict, self.sample_dict)
-            self.model = model_to_device(self.traced_model, self.device)
 
     def set_federated_model(self, federated_model_id=int(str(1)*11)):
         obj_with_id = ObjectWrapper(id=federated_model_id, obj=self.traced_model)

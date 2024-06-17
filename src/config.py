@@ -9,7 +9,8 @@ class Config:
                  optimizer_args=None,
                  loss=loss_fn,
                  shuffle=True,
-                 training_rounds=5):
+                 training_rounds=5,
+                 lr=0.001):
         if optimizer_args is None:
             optimizer_args = {"lr": 0.001}
         self.batch_size = batch_size
@@ -19,6 +20,7 @@ class Config:
         self.loss = loss
         self.shuffle = shuffle
         self.training_rounds = training_rounds
+        self.lr = lr
 
 
 config_dict = {

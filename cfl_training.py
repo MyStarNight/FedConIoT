@@ -23,7 +23,7 @@ async def send_command(commands, nodes):
 async def main():
     hook = sy.TorchHook(torch)
     me = sy.hook.local_worker
-    train_config = Config(training_rounds=20)
+    train_config = Config(training_rounds=5)
 
     # 连接并测试所有节点
     all_nodes_id = ['AA', 'BB', 'CC', 'DD', 'EE']
