@@ -13,7 +13,7 @@ def evaluate(model, device='cpu'):
 
     selected_data = []
     selected_target = []
-    for user in [21, 22, 23, 24]:
+    for user in [1, 2, 3, 4]:
         selected_data.append(HAR_datasets[user][:][0])
         selected_target.append(HAR_datasets[user][:][1])
 

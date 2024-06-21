@@ -13,10 +13,10 @@ from src import my_utils
 import socket
 
 KEEP_LABELS_DICT = {
-    "A": [1],
-    "B": [2],
-    "C": [3],
-    "D": [4],
+    "A": [21],
+    "B": [22],
+    "C": [23],
+    "D": [24],
     "E": [5],
     "F": [6],
     "G": [7],
@@ -28,8 +28,8 @@ KEEP_LABELS_DICT = {
     "CC": [15, 16],
     "DD": [17, 18],
     "EE": [19, 20],
-    "testing": [21, 22, 23, 24],
-    None: [21, 22, 23, 24],
+    "testing": [1, 2, 3, 4],
+    None: [1, 2, 3, 4],
 }
 
 

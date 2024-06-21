@@ -118,18 +118,19 @@ async def main():
     hook = sy.TorchHook(torch)
     me = sy.hook.local_worker
     train_config = Config(training_rounds=50)
-    node_pull_tree = {1: [(1, 0), (1, 2)], 2: [(0, 3), (2, 4)]}
-    node_push_tree = {1: [(3, 0), (4, 2)], 2: [(0, 1), (2, 1)]}
-    # node_pull_tree = {1: [(1, 0), (1, 2), (1, 3), (1, 4)]}
-    # node_push_tree = {1: [(3, 1), (4, 1), (0, 1), (2, 1)]}
+
+    # node_pull_tree = {1: [(1, 0), (1, 2), (1, 3)], 2: [(0, 4), (2, 5), (3, 6)]}
+    # node_push_tree = {1: [(4, 0), (5, 2), (6, 3)], 2: [(0, 1), (2, 1), (3, 1)]}
+
+    node_pull_tree = {1: [(1, 0), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6)]}
+    node_push_tree = {1: [(4, 1), (5, 1), (6, 1), (0, 1), (2, 1), (3, 1)]}
 
     pull_time = []
     push_time = []
     train_time = []
 
     # 指定节点并进行存储
-    # all_nodes_id = ['AA', 'BB', 'CC', 'DD', 'EE']
-    all_nodes_id = ['E', 'F', 'G', 'H', 'I']
+    all_nodes_id = ['AA', 'BB', 'CC', 'DD', 'E', 'F', 'G']
     all_nodes = []
     for node_id in all_nodes_id:
         all_nodes.append(MyWebsocketClientWorker(hook=hook, **generate_kwarg(node_id)))
