@@ -27,7 +27,7 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         # 训练部分的参数
         self.traced_model = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.train_config = Config(epochs=20, optimizer_args={'lr': 0.001})
+        self.train_config = Config(epochs=3, optimizer_args={'lr': 0.001})
         self.p_p = PullAndPush()
         self.train_state = False
         self.model_dict = {}
@@ -114,7 +114,7 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         if self.train_state is not True:
             raise ValueError("Train State is False")
 
-    def train(self, dataset_key: str):
+    def train(self, dataset_key: str, test=False):
 
         # 检测是否可以进行训练
         self.check_train_state()
@@ -157,7 +157,8 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
             torch.zeros([1, 400, 3], dtype=torch.float)
         )
 
-        evaluate(model, self.device)
+        if test:
+            evaluate(model, self.device)
         print(loss.item())
         print(f"{datetime.now()}: Training End")
 

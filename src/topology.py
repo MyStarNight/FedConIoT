@@ -242,9 +242,9 @@ def f_push(all_pair_paths, agg):
 
 
 if __name__ == '__main__':
-    np.random.seed(42)
+    np.random.seed(5)
 
-    n = 5
+    n = 8
     adj_matrix = generate_matrix(n)
     save_and_plt(adj_matrix)
     adj_list = matrix_to_adj_list(adj_matrix)

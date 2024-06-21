@@ -26,7 +26,8 @@ async def main():
     train_config = Config(training_rounds=50)
 
     # 连接并测试所有节点
-    all_nodes_id = ['AA', 'BB', 'CC', 'DD', 'EE']
+    # all_nodes_id = ['AA', 'BB', 'CC', 'DD', 'EE']
+    all_nodes_id = ['A', 'D', 'E', 'F', 'G']
     all_nodes = {}
     for node_id in all_nodes_id:
         all_nodes[node_id] = MyWebsocketClientWorker(hook=hook, **generate_kwarg(node_id))
@@ -55,8 +56,19 @@ async def main():
         all_nodes['AA'].command(generate_command_dict(command_name="change_state"))
         all_nodes['AA'].command(generate_command_dict(
             command_name="model_dissemination",
-            forward_device_id=['BB', 'CC', 'DD', 'EE']
+            forward_device_id=['BB', 'CC']
         ))
+
+        all_nodes['BB'].connect()
+        all_nodes['CC'].connect()
+        cmds = [
+            generate_command_dict(command_name="model_dissemination", forward_device_id=['DD']),
+            generate_command_dict(command_name="model_dissemination", forward_device_id=['EE'])
+        ]
+        await send_command(commands=cmds, nodes=[all_nodes['BB'], all_nodes['CC']])
+        all_nodes['BB'].close()
+        all_nodes['CC'].close()
+
         all_nodes['AA'].close()
         pull_time.append((datetime.now()-start).total_seconds())
 
@@ -78,20 +90,25 @@ async def main():
         logger.info("model collection")
         all_nodes['DD'].connect()
         all_nodes['EE'].connect()
+        cmds = [
+            generate_command_dict(command_name="model_collection", forward_device_id=['BB'], aggregation=True),
+            generate_command_dict(command_name="model_collection", forward_device_id=['CC'], aggregation=True),
+        ]
+        await send_command(
+            commands=cmds,
+            nodes=[all_nodes['DD'], all_nodes['EE']]
+        )
+        all_nodes['DD'].close()
+        all_nodes['EE'].close()
+
         all_nodes['BB'].connect()
         all_nodes['CC'].connect()
-
         cmds = [
-            generate_command_dict(command_name="model_collection", forward_device_id=['AA'], aggregation=False),
-            generate_command_dict(command_name="model_collection", forward_device_id=['AA'], aggregation=False),
             generate_command_dict(command_name="model_collection", forward_device_id=['AA'], aggregation=False),
             generate_command_dict(command_name="model_collection", forward_device_id=['AA'], aggregation=True),
         ]
-        for cmd, n in zip(cmds, list(all_nodes.values())[1:]):
+        for cmd, n in zip(cmds, [all_nodes['BB'], all_nodes['CC']]):
             n.command(cmd)
-
-        all_nodes['DD'].close()
-        all_nodes['EE'].close()
         all_nodes['BB'].close()
         all_nodes['CC'].close()
 

@@ -80,8 +80,8 @@ if __name__ == '__main__':
 
     raspberries = [
         {"ip": "192.168.3.2", "username": "pi", "password": "raspberry"},
-        {"ip": "192.168.3.3", "username": "pi", "password": "raspberry"},
-        {"ip": "192.168.3.4", "username": "pi", "password": "raspberry"},
+        # {"ip": "192.168.3.3", "username": "pi", "password": "raspberry"},
+        # {"ip": "192.168.3.4", "username": "pi", "password": "raspberry"},
         {"ip": "192.168.3.7", "username": "pi", "password": "raspberry"},
         {"ip": "192.168.3.8", "username": "pi", "password": "raspberry"},
         {"ip": "192.168.3.10", "username": "pi", "password": "raspberry"},
@@ -122,11 +122,11 @@ if __name__ == '__main__':
 
     elif operation == 'send_file':
         # 要发送的目标文件
-        local_file = r"E:\2024mem\AI-project\FedConIoT\src\websocket_server.py"
-        remote_folder = "/home/hao/work/fl-pj/FedConIoT/src"
+        local_file = r"E:\2024mem\AI-project\FedConIoT\src\my_utils.py"
+        remote_folder = "/home/pi/work/fl-pj/FedConIoT/src"
 
         # 发送文件
-        send_file(jetson_nanos, local_file, remote_folder)
+        send_file(raspberries, local_file, remote_folder)
 
     elif operation == 'command':
         # 执行命令
