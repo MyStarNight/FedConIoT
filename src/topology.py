@@ -6,23 +6,25 @@ from collections import Counter, deque, defaultdict
 
 
 def generate_matrix(n):
-    # 生成一个n*n的随机矩阵，元素值以1/2的概率为0或1
+    # 生成一个 n*n 的随机矩阵，元素值以 1/2 的概率为 0 或 1
     matrix = np.random.choice([0, 1], size=(n, n), p=[0.5, 0.5])
 
-    # 确保每一行至少有一个1
+    # 首先保证对角线上的元素都是 1
+    np.fill_diagonal(matrix, 1)
+
+    # 确保每一行至少有一个非对角线元素为 1
     for i in range(n):
-        if not np.any(matrix[i, :]):
-            col_index = np.random.choice(n)
+        if not np.any(matrix[i, :i]) and not np.any(matrix[i, i+1:]):
+            # 如果当前行的非对角线元素全为0，则随机选择一个非对角线位置置为1
+            col_index = np.random.choice(list(range(i)) + list(range(i+1, n)))
             matrix[i, col_index] = 1
 
-    # 确保每一列至少有一个1
+    # 确保每一列至少有一个非对角线元素为 1
     for j in range(n):
-        if not np.any(matrix[:, j]):
-            row_index = np.random.choice(n)
+        if not np.any(matrix[:j, j]) and not np.any(matrix[j+1:, j]):
+            # 如果当前列的非对角线元素全为0，则随机选择一个非对角线位置置为1
+            row_index = np.random.choice(list(range(j)) + list(range(j+1, n)))
             matrix[row_index, j] = 1
-
-    for c in range(n):
-        matrix[c, c] = 1
 
     return matrix
 
@@ -178,7 +180,7 @@ def push_time_calculating(node_tree):
     return t
 
 
-def f_pull(all_pair_paths, agg):
+def f_pull(all_pair_paths, agg, adj_list):
     pull_paths = {pair: path for pair, path in all_pair_paths.items() if pair[0] == agg}
 
     # 对渠道进行组合
@@ -210,7 +212,7 @@ def f_pull(all_pair_paths, agg):
     return t_min, best_tree
 
 
-def f_push(all_pair_paths, agg):
+def f_push(all_pair_paths, agg, adj_list):
     push_paths = {pair: path for pair, path in all_pair_paths.items() if pair[1] == agg}
     # print(push_paths)
 
@@ -241,15 +243,13 @@ def f_push(all_pair_paths, agg):
     return t_min, best_tree
 
 
-if __name__ == '__main__':
-    np.random.seed(5)
+def topology_to_policy(seed, node_num):
+    np.random.seed(seed)
 
-    n = 8
+    n = node_num
     adj_matrix = generate_matrix(n)
     save_and_plt(adj_matrix)
     adj_list = matrix_to_adj_list(adj_matrix)
-
-    result = bfs_all_shortest_paths(adj_matrix, 1)
 
     all_pair_paths = {}
     for send_node in adj_list.keys():
@@ -262,13 +262,13 @@ if __name__ == '__main__':
     # 计算发送时间
     node_pull_result = {}
     for node in adj_list.keys():
-        t_pull, tree_pull = f_pull(all_pair_paths, agg=node)
+        t_pull, tree_pull = f_pull(all_pair_paths, agg=node, adj_list=adj_list)
         node_pull_result[node] = (t_pull, tree_pull)
 
     # 计算回收时间
     node_push_result = {}
     for node in adj_list.keys():
-        t_push, tree_push = f_push(all_pair_paths, agg=node)
+        t_push, tree_push = f_push(all_pair_paths, agg=node,adj_list=adj_list)
         node_push_result[node] = (t_push, tree_push)
 
     # 定义发送时间
@@ -279,3 +279,10 @@ if __name__ == '__main__':
         t_sum = node_push_result[node][0] * t_pull_unit + node_pull_result[node][0] \
                 * t_push_unit
         t_sum_list.append(t_sum)
+
+    return node_pull_result, node_push_result, t_sum_list
+
+
+if __name__ == '__main__':
+    node_pull_result, node_push_result, t_sum_list = topology_to_policy(seed=77, node_num=5)
+

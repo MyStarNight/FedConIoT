@@ -10,6 +10,7 @@ import asyncio
 import logging
 from src.model_evaluation import evaluate
 from typing import List
+from src import topology
 
 
 async def send_command(commands, nodes):
