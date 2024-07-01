@@ -284,5 +284,5 @@ def topology_to_policy(seed, node_num):
 
 
 if __name__ == '__main__':
-    node_pull_result, node_push_result, t_sum_list = topology_to_policy(seed=77, node_num=5)
+    node_pull_result, node_push_result, t_sum_list = topology_to_policy(seed=15, node_num=15)
 

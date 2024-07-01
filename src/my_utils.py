@@ -16,7 +16,7 @@ client_device_mapping_id = {
     "192.168.3.12": "H",
     "192.168.3.13": "I",
     "192.168.3.20": "J",
-    "192.168.3.25": "testing"
+    "192.168.3.22": "testing"
 }
 
 id_mapping_client_device = {value: key for key, value in client_device_mapping_id.items()}

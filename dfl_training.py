@@ -2,6 +2,7 @@ import syft as sy
 from syft.workers.websocket_client import WebsocketClientWorker
 from src.websocket_client import MyWebsocketClientWorker
 from src.nn_model import ConvNet1D, loss_fn
+import matplotlib.pyplot as plt
 from src.my_utils import generate_kwarg, generate_command_dict
 from src.config import Config
 import torch
@@ -11,6 +12,9 @@ import logging
 from src.model_evaluation import evaluate
 from typing import List
 from src import topology
+import pandas as pd
+import os
+from p_tree import Nodes5, Nodes7, Nodes10, Nodes13, Nodes15
 
 
 async def send_command(commands, nodes):
@@ -118,31 +122,33 @@ def set_federated_model(node: MyWebsocketClientWorker, me):
 async def main():
     hook = sy.TorchHook(torch)
     me = sy.hook.local_worker
-    train_config = Config(training_rounds=50)
+    train_config = Config(training_rounds=100)
 
-    # node_pull_tree = {1: [(1, 0), (1, 2), (1, 3)], 2: [(0, 4), (2, 5), (3, 6)]}
-    # node_push_tree = {1: [(4, 0), (5, 2), (6, 3)], 2: [(0, 1), (2, 1), (3, 1)]}
-
-    node_pull_tree = {1: [(1, 0), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6)]}
-    node_push_tree = {1: [(4, 1), (5, 1), (6, 1), (0, 1), (2, 1), (3, 1)]}
+    edf = Nodes5()
 
     pull_time = []
     push_time = []
     train_time = []
+    accuracy_list = []
 
     # 指定节点并进行存储
-    all_nodes_id = ['AA', 'BB', 'CC', 'DD', 'E', 'F', 'G']
+    all_nodes_id = ['AA', 'BB', 'CC', 'EE', 'DD']
     all_nodes = []
     for node_id in all_nodes_id:
         all_nodes.append(MyWebsocketClientWorker(hook=hook, **generate_kwarg(node_id)))
     close_connection(all_nodes)
 
     # 选择节点初始化模型
-    initialized_model(all_nodes[2-1])
+    initialized_model(all_nodes[edf.agg[0]])
 
     # 开始训练
     for cur_round in range(1, train_config.training_rounds+1):
         logger.info(f"Training round {cur_round}/{train_config.training_rounds}")
+
+        index = (cur_round-1) % len(edf.agg)
+        agg_index = cur_round % len(edf.agg)
+        node_pull_tree = edf.node_pull_trees[index]
+        node_push_tree = edf.node_push_trees[index]
 
         # 下发模型
         logger.info(f"model dissemination")
@@ -151,7 +157,7 @@ async def main():
         pull_time.append((datetime.now() - start).total_seconds())
 
         # 调整发送模型的训练状态
-        change_state(all_nodes[2 - 1])
+        change_state(all_nodes[edf.agg[index]])
 
         # 训练模型
         logger.info("model training")
@@ -166,10 +172,11 @@ async def main():
         push_time.append((datetime.now() - start).total_seconds())
 
         if cur_round % 5 == 0 or cur_round == train_config.training_rounds:
-            model = set_federated_model(all_nodes[2-1], me)
-            evaluate(model)
+            model = set_federated_model(all_nodes[edf.agg[agg_index]], me)
+            accuracy = evaluate(model)
+            accuracy_list.append(accuracy)
 
-    return pull_time, train_time, push_time
+    return pull_time, train_time, push_time, accuracy_list
 
 
 if __name__ == '__main__':
@@ -180,4 +187,28 @@ if __name__ == '__main__':
     logging.basicConfig(format=FORMAT)
     logger.setLevel(level=logging.DEBUG)
 
-    pull_time, train_time, push_time = asyncio.get_event_loop().run_until_complete(main())
+    pull_time, train_time, push_time, accuracy_list = asyncio.get_event_loop().run_until_complete(main())
+
+    df_time = pd.DataFrame([pull_time, train_time, push_time], index=['pull', 'train', 'push']).T
+    df_accuracy = pd.DataFrame(accuracy_list, index=[5*(i+1) for i in range(len(accuracy_list))])
+
+    save_path = "result"
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+
+    current_time = datetime.now()
+    time_str = current_time.strftime('%Y-%m-%d_%H-%M-%S')
+
+    df_time.to_csv(f'{save_path}/time_{time_str}.csv')
+    df_accuracy.to_csv(f'{save_path}/accuracy_{time_str}.csv')
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(accuracy_list, marker='o', linestyle='-', color='b', label='Average Accuracy')
+    plt.legend()
+    plt.title('Accuracy of DFL', fontsize=16)
+    plt.xlabel('Training Rounds', fontsize=14)
+    plt.ylabel('Accuracy', fontsize=14)
+    plt.xticks(range(len(accuracy_list)), fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.grid(True)
+    plt.show()

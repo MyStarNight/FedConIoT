@@ -30,8 +30,10 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
         self.train_config = Config(epochs=3, optimizer_args={'lr': 0.001})
         self.p_p = PullAndPush()
         self.train_state = False
+
         self.model_dict = {}
         self.model_id = my_utils.device_id_to_model_id(self.id)
+
         self.sample_length = 0
         self.sample_dict = {}
 
@@ -201,3 +203,10 @@ class MyWebsocketServerWorker(WebsocketServerWorker):
     def show_node_state(self):
         print(self.model_dict.keys())
         print(self.sample_dict)
+
+    def model_evaluation(self):
+        evaluate(self.traced_model)
+
+    def central_node_storage_clear(self):
+        self.model_dict = {}
+        self.sample_dict = {}

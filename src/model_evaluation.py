@@ -56,3 +56,4 @@ def evaluate(model, device='cpu'):
     #     accuracy = (class_correct[label] / class_total[label]) * 100 if class_total[label] != 0 else 0
     #     print(f'Class {label} Accuracy: {accuracy:.2f}%')
 
+    return test_correct/test_total

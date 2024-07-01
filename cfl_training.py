@@ -9,6 +9,9 @@ from datetime import datetime
 import asyncio
 import logging
 from src.model_evaluation import evaluate
+import dfl_training as dfl
+import pandas as pd
+import os
 
 
 async def send_command(commands, nodes):
@@ -20,91 +23,63 @@ async def send_command(commands, nodes):
     )
 
 
+def clear_central_node_storage(node: MyWebsocketClientWorker):
+    dfl.start_connection([node])
+    node.command(generate_command_dict(command_name="central_node_storage_clear"))
+    dfl.close_connection([node])
+
+
 async def main():
     hook = sy.TorchHook(torch)
     me = sy.hook.local_worker
-    train_config = Config(training_rounds=50)
-
-    # 连接并测试所有节点
-    all_nodes_id = ['AA', 'BB', 'CC', 'DD', 'EE']
-    all_nodes = {}
-    for node_id in all_nodes_id:
-        all_nodes[node_id] = MyWebsocketClientWorker(hook=hook, **generate_kwarg(node_id))
-
-    # 清除并断开连接
-    for node in all_nodes.values():
-        node.clear_objects_remote()
-        node.close()
-
-    # 在第一个设备初始化模型
-    all_nodes['AA'].connect()
-    all_nodes['AA'].command(generate_command_dict(command_name="model_initialization"))
-    all_nodes['AA'].close()
+    train_config = Config(training_rounds=100)
 
     pull_time = []
     push_time = []
     train_time = []
+    accuracy_list = []
 
-    for cur_round in range(1, train_config.training_rounds+1):
+    all_nodes_id = ['testing', 'AA', 'BB', 'CC', 'EE', 'DD']
+    all_nodes = []
+    for node_id in all_nodes_id:
+        all_nodes.append(MyWebsocketClientWorker(hook=hook, **generate_kwarg(node_id)))
+    dfl.close_connection(all_nodes)
+
+    node_pull_tree = {1: [(0, i) for i in range(1, len(all_nodes))]}
+    node_push_tree = {1: [(i, 0) for i in range(1, len(all_nodes))]}
+
+    dfl.initialized_model(all_nodes[0])
+
+    for cur_round in range(1, train_config.training_rounds + 1):
         logger.info(f"Training round {cur_round}/{train_config.training_rounds}")
 
-        start = datetime.now()
         # 下发模型
         logger.info(f"model dissemination")
-        all_nodes['AA'].connect()
-        all_nodes['AA'].command(generate_command_dict(command_name="change_state"))
-        all_nodes['AA'].command(generate_command_dict(
-            command_name="model_dissemination",
-            forward_device_id=['BB', 'CC', 'DD', 'EE']
-        ))
-        all_nodes['AA'].close()
-        pull_time.append((datetime.now()-start).total_seconds())
-
         start = datetime.now()
-        # 开始进行训练
+        await dfl.disseminate_model(node_pull_tree, all_nodes_id, all_nodes)
+        pull_time.append((datetime.now() - start).total_seconds())
+
+        # 训练模型
         logger.info("model training")
-        for node in all_nodes.values():
-            node.connect()
-        await send_command(
-            commands=[generate_command_dict(command_name="train", dataset_key="HAR-1")]*5,
-            nodes=list(all_nodes.values())
-        )
-        for node in all_nodes.values():
-            node.close()
+        start = datetime.now()
+        await dfl.train_model(all_nodes[1:])
         train_time.append((datetime.now() - start).total_seconds())
 
-        start = datetime.now()
+        # 清空
+        clear_central_node_storage(all_nodes[0])
+
         # 模型回收
         logger.info("model collection")
-        all_nodes['DD'].connect()
-        all_nodes['EE'].connect()
-        all_nodes['BB'].connect()
-        all_nodes['CC'].connect()
-
-        cmds = [
-            generate_command_dict(command_name="model_collection", forward_device_id=['AA'], aggregation=False),
-            generate_command_dict(command_name="model_collection", forward_device_id=['AA'], aggregation=False),
-            generate_command_dict(command_name="model_collection", forward_device_id=['AA'], aggregation=False),
-            generate_command_dict(command_name="model_collection", forward_device_id=['AA'], aggregation=True),
-        ]
-        for cmd, n in zip(cmds, list(all_nodes.values())[1:]):
-            n.command(cmd)
-
-        all_nodes['DD'].close()
-        all_nodes['EE'].close()
-        all_nodes['BB'].close()
-        all_nodes['CC'].close()
-
+        start = datetime.now()
+        await dfl.collect_model(node_push_tree, all_nodes_id, all_nodes)
         push_time.append((datetime.now() - start).total_seconds())
 
         if cur_round % 5 == 0 or cur_round == train_config.training_rounds:
-            all_nodes['AA'].connect()
-            all_nodes['AA'].command(generate_command_dict(command_name="set_federated_model"))
-            model = me.request_obj(int(str(1)*11), all_nodes['AA']).obj
-            all_nodes['AA'].close()
-            evaluate(model)
+            model = dfl.set_federated_model(all_nodes[0], me)
+            accuracy = evaluate(model)
+            accuracy_list.append(accuracy)
 
-    return pull_time, train_time, push_time
+    return pull_time, train_time, push_time, accuracy_list
 
 
 if __name__ == '__main__':
@@ -115,4 +90,20 @@ if __name__ == '__main__':
     logging.basicConfig(format=FORMAT)
     logger.setLevel(level=logging.DEBUG)
 
-    pull_time, train_time, push_time = asyncio.get_event_loop().run_until_complete(main())
+    pull_time, train_time, push_time, accuracy_list = asyncio.get_event_loop().run_until_complete(main())
+
+    df_time = pd.DataFrame([pull_time, train_time, push_time], index=['pull', 'train', 'push']).T
+    df_accuracy = pd.DataFrame(accuracy_list, index=[5*(i+1) for i in range(len(accuracy_list))])
+
+    save_path = "result"
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+
+    current_time = datetime.now()
+    time_str = current_time.strftime('%Y-%m-%d_%H-%M-%S')
+
+    df_time.to_csv(f'{save_path}/time_{time_str}.csv')
+    df_accuracy.to_csv(f'{save_path}/accuracy_{time_str}.csv')
+
+
+
