@@ -12,6 +12,7 @@ import logging
 from src.model_evaluation import evaluate
 from typing import List
 from src import topology
+from src.pull_and_push import PullAndPush
 import pandas as pd
 import os
 from p_tree import Nodes5, Nodes7, Nodes10, Nodes13, Nodes15
@@ -39,6 +40,17 @@ def close_connection(nodes: List[MyWebsocketClientWorker]):
 def initialized_model(node: MyWebsocketClientWorker):
     start_connection([node])
     node.command(generate_command_dict(command_name="model_initialization"))
+    close_connection([node])
+
+
+def keep_training_model(node: MyWebsocketClientWorker):
+    start_connection([node])
+    p_p = PullAndPush()
+    model = ConvNet1D(input_size=400, num_classes=7)
+    model.load_state_dict(torch.load('result/model.pth'))
+    traced_model = torch.jit.trace(model, torch.zeros([1, 400, 3], dtype=torch.float))
+    obj_ptr, obj_id = p_p.send(traced_model, node)
+    node.command(generate_command_dict(command_name="model_configuration", model_id=obj_id))
     close_connection([node])
 
 
@@ -119,12 +131,34 @@ def set_federated_model(node: MyWebsocketClientWorker, me):
     return model
 
 
-async def main():
+def visualization(accuracy_list):
+    plt.figure(figsize=(10, 6))
+
+    round_list = [5*(i+1) for i in range(len(accuracy_list))]
+    plt.plot(round_list, accuracy_list, marker='o', linestyle='-', color='b', label='Average Accuracy')
+    plt.legend()
+    plt.title('Accuracy of FL', fontsize=16)
+    plt.xlabel('Training Rounds', fontsize=14)
+    plt.ylabel('Accuracy', fontsize=14)
+    plt.xticks(round_list, fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.grid(True)
+    plt.show()
+
+
+async def main(new_start=True, training_rounds=100):
     hook = sy.TorchHook(torch)
     me = sy.hook.local_worker
-    train_config = Config(training_rounds=100)
+    train_config = Config(training_rounds=training_rounds)
 
-    edf = Nodes5()
+    save_path = "result"
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+
+    current_time = datetime.now()
+    time_str = current_time.strftime('%Y-%m-%d_%H-%M-%S')
+
+    edf = Nodes15()
 
     pull_time = []
     push_time = []
@@ -132,14 +166,17 @@ async def main():
     accuracy_list = []
 
     # 指定节点并进行存储
-    all_nodes_id = ['AA', 'BB', 'CC', 'EE', 'DD']
+    all_nodes_id = edf.j_5_r_10
     all_nodes = []
     for node_id in all_nodes_id:
         all_nodes.append(MyWebsocketClientWorker(hook=hook, **generate_kwarg(node_id)))
     close_connection(all_nodes)
 
     # 选择节点初始化模型
-    initialized_model(all_nodes[edf.agg[0]])
+    if new_start:
+        initialized_model(all_nodes[edf.agg[0]])
+    else:
+        keep_training_model(all_nodes[edf.agg[0]])
 
     # 开始训练
     for cur_round in range(1, train_config.training_rounds+1):
@@ -176,6 +213,14 @@ async def main():
             accuracy = evaluate(model)
             accuracy_list.append(accuracy)
 
+            # 保存所需的数据
+            df_time = pd.DataFrame([pull_time, train_time, push_time], index=['pull', 'train', 'push']).T
+            df_accuracy = pd.DataFrame(accuracy_list, index=[5 * (i + 1) for i in range(len(accuracy_list))])
+
+            df_time.to_csv(f'{save_path}/time_{time_str}.csv')
+            df_accuracy.to_csv(f'{save_path}/accuracy_{time_str}.csv')
+            torch.save(model.state_dict(), 'result/model.pth')
+
     return pull_time, train_time, push_time, accuracy_list
 
 
@@ -187,28 +232,10 @@ if __name__ == '__main__':
     logging.basicConfig(format=FORMAT)
     logger.setLevel(level=logging.DEBUG)
 
-    pull_time, train_time, push_time, accuracy_list = asyncio.get_event_loop().run_until_complete(main())
+    n_s = False
+    t_r = 15
 
-    df_time = pd.DataFrame([pull_time, train_time, push_time], index=['pull', 'train', 'push']).T
-    df_accuracy = pd.DataFrame(accuracy_list, index=[5*(i+1) for i in range(len(accuracy_list))])
+    pull_time, train_time, push_time, accuracy_list = asyncio.get_event_loop().run_until_complete(main(new_start=n_s,
+                                                                                                       training_rounds=t_r))
 
-    save_path = "result"
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)
-
-    current_time = datetime.now()
-    time_str = current_time.strftime('%Y-%m-%d_%H-%M-%S')
-
-    df_time.to_csv(f'{save_path}/time_{time_str}.csv')
-    df_accuracy.to_csv(f'{save_path}/accuracy_{time_str}.csv')
-
-    plt.figure(figsize=(10, 6))
-    plt.plot(accuracy_list, marker='o', linestyle='-', color='b', label='Average Accuracy')
-    plt.legend()
-    plt.title('Accuracy of DFL', fontsize=16)
-    plt.xlabel('Training Rounds', fontsize=14)
-    plt.ylabel('Accuracy', fontsize=14)
-    plt.xticks(range(len(accuracy_list)), fontsize=12)
-    plt.yticks(fontsize=12)
-    plt.grid(True)
-    plt.show()
+    visualization(accuracy_list)

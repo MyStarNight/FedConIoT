@@ -9,6 +9,8 @@ def change_index(input_dict):
 
 class Nodes5:
     def __init__(self):
+        self.j_5 = ['AA', 'BB', 'CC', 'DD', 'EE']
+        self.r_5 = ['A', 'B', 'C', 'D', 'E']
         self.agg = [i-1 for i in [1, 3]]
 
         self.node_pull_tree_1 = change_index({1: [(1, 2), (1, 3)], 2: [(2, 5), (3, 4)]})
@@ -23,6 +25,9 @@ class Nodes5:
 
 class Nodes7:
     def __init__(self):
+        self.j_3_r_4 = ["AA", "BB", "A", "B", "C", "CC", "D"]
+        self.j_5_r_2 = ["AA", "A", "BB", "CC", "DD", "EE", "B"]
+        self.r_7 = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
         self.agg = [0, 5]
         self.node_pull_tree_1 = change_index({1: [(1, 2), (1, 5), (1, 4)], 2: [(5, 3), (2, 6), (4, 7)]})
         self.node_push_tree_1 = change_index({1: [(1, 2), (4, 7), (5, 3)], 2: [(2, 6), (3, 6), (7, 6)]})
@@ -36,6 +41,8 @@ class Nodes7:
 
 class Nodes10:
     def __init__(self):
+        self.j_5_r_5 = ['A', 'AA', 'B', 'BB', 'C', 'CC', 'D', 'DD', 'E', 'EE']
+        self.r_10 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
         self.agg = [1, 3, 5]
         self.node_pull_tree_1 = change_index(
             {1: [(2, 1), (2, 7), (2, 5), (2, 8), (2, 10)], 2: [(7, 3), (5, 4), (8, 6), (10, 9)]})
@@ -58,6 +65,8 @@ class Nodes10:
 
 class Nodes13:
     def __init__(self):
+        self.j_3_r_10 = ['AA', 'BB', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'CC']
+        self.j_5_r_8 = ['AA', 'BB', 'A', 'B', 'C', 'DD', 'EE', 'F', 'G', 'H', 'I', 'J', 'CC']
         self.agg = [i - 1 for i in [1, 2, 6, 13]]
         self.node_pull_tree_1 = change_index({1: [(1, 4), (1, 11), (1, 10), (1, 7), (1, 8)],
                                               2: [(4, 2), (11, 3), (10, 5), (10, 6), (11, 9), (8, 12), (7, 13)]})
@@ -96,6 +105,7 @@ class Nodes13:
 
 class Nodes15:
     def __init__(self):
+        self.j_5_r_10 = ['AA', 'BB', 'CC', 'DD', 'EE', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
         self.agg = [i - 1 for i in [1, 2, 3, 4]]
         self.node_pull_tree_1 = change_index({1: [(1, 13), (1, 14), (1, 6), (1, 15), (1, 11)],
                                               2: [(13, 2),

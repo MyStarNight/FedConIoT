@@ -12,15 +12,7 @@ from src.model_evaluation import evaluate
 import dfl_training as dfl
 import pandas as pd
 import os
-
-
-async def send_command(commands, nodes):
-    await asyncio.gather(
-        *[
-            n.async_command(cmd)
-            for n, cmd in zip(nodes, commands)
-        ]
-    )
+import matplotlib.pyplot as plt
 
 
 def clear_central_node_storage(node: MyWebsocketClientWorker):
@@ -29,17 +21,24 @@ def clear_central_node_storage(node: MyWebsocketClientWorker):
     dfl.close_connection([node])
 
 
-async def main():
+async def main(new_start=True, training_rounds=100):
     hook = sy.TorchHook(torch)
     me = sy.hook.local_worker
-    train_config = Config(training_rounds=100)
+    train_config = Config(training_rounds=training_rounds)
+
+    save_path = "result"
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
 
     pull_time = []
     push_time = []
     train_time = []
     accuracy_list = []
 
-    all_nodes_id = ['testing', 'AA', 'BB', 'CC', 'EE', 'DD']
+    current_time = datetime.now()
+    time_str = current_time.strftime('%Y-%m-%d_%H-%M-%S')
+
+    all_nodes_id = ['testing', 'AA', 'BB', 'CC', 'DD', 'EE', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
     all_nodes = []
     for node_id in all_nodes_id:
         all_nodes.append(MyWebsocketClientWorker(hook=hook, **generate_kwarg(node_id)))
@@ -48,7 +47,10 @@ async def main():
     node_pull_tree = {1: [(0, i) for i in range(1, len(all_nodes))]}
     node_push_tree = {1: [(i, 0) for i in range(1, len(all_nodes))]}
 
-    dfl.initialized_model(all_nodes[0])
+    if new_start:
+        dfl.initialized_model(all_nodes[0])
+    else:
+        dfl.keep_training_model(all_nodes[0])
 
     for cur_round in range(1, train_config.training_rounds + 1):
         logger.info(f"Training round {cur_round}/{train_config.training_rounds}")
@@ -79,6 +81,14 @@ async def main():
             accuracy = evaluate(model)
             accuracy_list.append(accuracy)
 
+            # 保存所需的数据
+            df_time = pd.DataFrame([pull_time, train_time, push_time], index=['pull', 'train', 'push']).T
+            df_accuracy = pd.DataFrame(accuracy_list, index=[5 * (i + 1) for i in range(len(accuracy_list))])
+
+            df_time.to_csv(f'{save_path}/time_{time_str}.csv')
+            df_accuracy.to_csv(f'{save_path}/accuracy_{time_str}.csv')
+            torch.save(model.state_dict(), 'result/model.pth')
+
     return pull_time, train_time, push_time, accuracy_list
 
 
@@ -90,20 +100,10 @@ if __name__ == '__main__':
     logging.basicConfig(format=FORMAT)
     logger.setLevel(level=logging.DEBUG)
 
-    pull_time, train_time, push_time, accuracy_list = asyncio.get_event_loop().run_until_complete(main())
+    n_s = False
+    t_r = 30
 
-    df_time = pd.DataFrame([pull_time, train_time, push_time], index=['pull', 'train', 'push']).T
-    df_accuracy = pd.DataFrame(accuracy_list, index=[5*(i+1) for i in range(len(accuracy_list))])
+    pull_time, train_time, push_time, accuracy_list = asyncio.get_event_loop().run_until_complete(main(new_start=n_s,
+                                                                                                       training_rounds=t_r))
 
-    save_path = "result"
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)
-
-    current_time = datetime.now()
-    time_str = current_time.strftime('%Y-%m-%d_%H-%M-%S')
-
-    df_time.to_csv(f'{save_path}/time_{time_str}.csv')
-    df_accuracy.to_csv(f'{save_path}/accuracy_{time_str}.csv')
-
-
-
+    dfl.visualization(accuracy_list)
