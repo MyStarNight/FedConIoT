@@ -16,32 +16,32 @@ from syft.messaging.message import ObjectRequestMessage
 class MyWebsocketClientWorker(WebsocketClientWorker):
 
     async def async_command(self, command: dict, return_id=None):
-        try:
-            self.close()
+        # try:
+        self.close()
 
-            async with websockets.connect(
-                    self.url, timeout=60, max_size=None, ping_timeout=60
-            ) as websocket:
+        async with websockets.connect(
+                self.url, timeout=60, max_size=None, ping_timeout=60
+        ) as websocket:
 
-                message = self.create_worker_command_message(**command)
+            message = self.create_worker_command_message(**command)
 
-                serialized_message = sy.serde.serialize(message)
-                await websocket.send(str(binascii.hexlify(serialized_message)))
-                await websocket.recv()
+            serialized_message = sy.serde.serialize(message)
+            await websocket.send(str(binascii.hexlify(serialized_message)))
+            await websocket.recv()
 
-            self.connect()
+        self.connect()
 
-            if return_id is None:
-                return
-            else:
-                msg = ObjectRequestMessage(return_id, None, "")
-                serialized_message = sy.serde.serialize(msg)
-                response = self._send_msg(serialized_message)
-                return response
-
-        except Exception as e:
-            print(f"An error occurred during async_command: {str(e)}")
-            return None
+        if return_id is None:
+            return
+        else:
+            msg = ObjectRequestMessage(return_id, None, "")
+            serialized_message = sy.serde.serialize(msg)
+            response = self._send_msg(serialized_message)
+            return response
+        #
+        # except Exception as e:
+        #     print(f"An error occurred during async_command: {str(e)}")
+        #     return None
 
     def command(self, command: dict):
         return self._send_msg_and_deserialize(**command)

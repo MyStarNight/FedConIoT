@@ -232,10 +232,10 @@ if __name__ == '__main__':
     logging.basicConfig(format=FORMAT)
     logger.setLevel(level=logging.DEBUG)
 
-    n_s = False
+    n_s = True
     t_r = 15
 
-    pull_time, train_time, push_time, accuracy_list = asyncio.get_event_loop().run_until_complete(main(new_start=n_s,
-                                                                                                       training_rounds=t_r))
+    pull_time, train_time, push_time, accuracy_list =\
+        asyncio.get_event_loop().run_until_complete(main(new_start=n_s, training_rounds=t_r))
 
     visualization(accuracy_list)

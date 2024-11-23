@@ -36,7 +36,7 @@ def save_and_plt(matrix):
 
     # 绘制矩阵
     fig, ax = plt.subplots()
-    cax = ax.matshow(matrix, cmap='Reds')
+    cax = ax.matshow(matrix, cmap='Blues')
     plt.title('Adjacency Matrix of Topology')
     plt.xlabel('Receive')
     plt.ylabel('Send')
@@ -243,11 +243,18 @@ def f_push(all_pair_paths, agg, adj_list):
     return t_min, best_tree
 
 
-def topology_to_policy(seed, node_num):
-    np.random.seed(seed)
+def topology_to_policy(seed=None, node_num=None, matrix=None):
+    if seed is not None:
+        np.random.seed(seed)
 
-    n = node_num
-    adj_matrix = generate_matrix(n)
+    if matrix is not None:
+        adj_matrix = matrix
+    elif node_num is not None:
+        n = node_num
+        adj_matrix = generate_matrix(n)
+    elif matrix is None and node_num is None:
+        raise ValueError("matrix and node_num are not defined.")
+
     save_and_plt(adj_matrix)
     adj_list = matrix_to_adj_list(adj_matrix)
 
@@ -284,5 +291,5 @@ def topology_to_policy(seed, node_num):
 
 
 if __name__ == '__main__':
-    node_pull_result, node_push_result, t_sum_list = topology_to_policy(seed=15, node_num=15)
+    node_pull_result, node_push_result, t_sum_list = topology_to_policy(seed=42, node_num=8)
 

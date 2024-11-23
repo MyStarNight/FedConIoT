@@ -1,3 +1,7 @@
+from src import topology
+import numpy as np
+
+
 def change_index(input_dict):
     new_dict = {}
 
@@ -5,6 +9,67 @@ def change_index(input_dict):
         new_dict[key] = [(x - 1, y - 1) for x, y in tuple_list]
 
     return new_dict
+
+
+class Nodes:
+    def __init__(self):
+        self.agg_num = None
+
+        self.nodes_id = None
+        self.adj_matrix = None
+        self.t_sum_list = None
+        self.node_pull_result = None
+        self.node_push_result = None
+
+        self.agg = None
+        self.node_pull_trees = None
+        self.node_push_trees = None
+
+        self.all_nodes = []
+
+    def initialized_settings(self, nodes_id, agg_num, seed=None):
+        if seed is not None:
+            np.random.seed(seed)
+
+        self.nodes_id = nodes_id
+        self.agg_num = agg_num
+        self.adj_matrix = topology.generate_matrix(len(nodes_id))
+        self.node_pull_result, self.node_push_result, self.t_sum_list = \
+            topology.topology_to_policy(matrix=self.adj_matrix)
+
+    def robust_settings(self, failed_nodes_index):
+
+        # 首先删除不可使用的节点
+        self.nodes_id.pop(failed_nodes_index-1)
+        # self.all_nodes.pop(failed_nodes_index-1)
+        self.delete_failed_node(failed_nodes_index)
+        self.node_pull_result, self.node_push_result, self.t_sum_list = \
+            topology.topology_to_policy(matrix=self.adj_matrix)
+
+    def find_best_policies(self):
+        # 选择合适的聚合节点进行聚合
+        sorted_indices = np.argsort(self.t_sum_list) + 1
+        agg_indices = list(sorted_indices[:self.agg_num])
+
+        # 选定回收的顺序
+        back_agg_indices = agg_indices[1:]
+        back_agg_indices.append(agg_indices[0])
+
+        # 选择模型下发路径
+        node_pull_trees, node_push_trees = [], []
+        for i in range(len(agg_indices)):
+            node_pull_trees.append(change_index(self.node_pull_result[agg_indices[i]][1]))
+            node_push_trees.append(change_index(self.node_push_result[back_agg_indices[i]][1]))
+
+        self.agg = [i-1 for i in agg_indices]
+        self.node_pull_trees = node_pull_trees
+        self.node_push_trees = node_push_trees
+
+    def delete_failed_node(self, failed_node_index):
+        k = failed_node_index - 1
+        self.adj_matrix = np.delete(self.adj_matrix, k, axis=0)
+        self.adj_matrix = np.delete(self.adj_matrix, k, axis=1)
+
 
 
 class Nodes5:
@@ -186,3 +251,11 @@ class Nodes15:
             self.node_push_tree_3,
             self.node_push_tree_4
         ]
+
+
+if __name__ == '__main__':
+    # 测试代码
+    nodes_id = ['AA', 'BB', 'CC', 'DD', 'EE', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+    edf = Nodes()
+    edf.initialized_settings(nodes_id.copy(), 3, seed=15)
+    edf.find_best_policies()

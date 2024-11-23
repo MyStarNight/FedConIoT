@@ -117,7 +117,7 @@ def exp1_visualization_all():
     plt.legend(loc='lower right', fontsize=12)
     plt.show()
 
-    # 分图：横坐标round，纵坐标accuracy
+    # 子图：横坐标round，纵坐标accuracy
     fig, axs = plt.subplots(2, 2, figsize=(12, 10))
     for i, ax in enumerate(axs.flat):
         ax.plot(cfl_accuracy_df_list[i], label=f'{group_name_list[i]} CFL', color=color_list[i], linestyle='--',
@@ -149,7 +149,7 @@ def exp1_visualization_all():
     plt.legend(loc='lower right', fontsize=12)
     plt.show()
 
-    # 分图：横坐标round，纵坐标accuracy
+    # 子图：横坐标round，纵坐标accuracy
     fig, axs = plt.subplots(2, 2, figsize=(12, 10))
     for i, ax in enumerate(axs.flat):
         ax.plot(cfl_time_list_list[i], cfl_accuracy_df_list[i], label=f'{group_name_list[i]} CFL', color=color_list[i], linestyle='--',
@@ -165,6 +165,36 @@ def exp1_visualization_all():
         ax.legend(loc='lower right')
     plt.tight_layout()
     plt.show()
+
+    # 分图：横坐标round，纵坐标accuracy
+    for i, group_name in enumerate(group_name_list):
+        plt.figure(figsize=(6, 5))
+        plt.plot(cfl_accuracy_df_list[i], label=f'CFL Accuracy', color=color_list[i], linestyle='--', marker='x')
+        plt.plot(dfl_accuracy_df_list[i], label=f'DFL Accuracy', color=color_list[i], linestyle='-', marker='o')
+        plt.title('Model Accuracy over Rounds', fontsize=18)
+        plt.xlabel('Rounds', fontsize=16)
+        plt.ylabel('Accuracy', fontsize=16)
+        plt.ylim(0.4, 0.9)
+        plt.xlim(0, 105)
+        plt.grid(True, linestyle='--', alpha=0.6)
+        plt.legend(loc='lower right', fontsize=14)
+        plt.savefig(rf'E:\onedrive\Academic-Research\paper-draft\pic\accuracy\myplot{i+1}.png')
+        plt.show()
+
+    # 分图：横坐标time，纵坐标accuracy
+    for i, group_name in enumerate(group_name_list):
+        plt.figure(figsize=(6, 5))
+        plt.plot(cfl_time_list_list[i], cfl_accuracy_df_list[i], label=f'CFL Accuracy', color=color_list[i], linestyle='--', marker='x')
+        plt.plot(dfl_time_list_list[i], dfl_accuracy_df_list[i], label=f'DFL Accuracy', color=color_list[i], linestyle='-', marker='o')
+        plt.title('Model Accuracy over Time', fontsize=18)
+        plt.xlabel('Time(seconds)', fontsize=16)
+        plt.ylabel('Accuracy', fontsize=16)
+        plt.ylim(0.4, 0.9)
+        # plt.xlim()
+        plt.grid(True, linestyle='--', alpha=0.6)
+        plt.legend(loc='lower right', fontsize=14)
+        plt.savefig(rf'E:\onedrive\Academic-Research\paper-draft\pic\accuracy\myplot{i+5}.png')
+        plt.show()
 
     return cfl_accuracy_df_list, dfl_accuracy_df_list, cfl_time_list_list, dfl_time_list_list
 
@@ -208,7 +238,66 @@ def exp2_visualization():
     plt.show()
 
 
+def exp3_visualization():
+    dfl_time = pd.read_excel('result/robust-training/time_list.xlsx', index_col=0)
+    accuracy = pd.read_excel('result/robust-training/accuracy.xlsx', index_col=0)
+    num_samples = [15*80] * 25 + [14*80] * 25 + [13*80] * 10 + [12*80] * 15 + [11*80] * 15 + [9*80] * 10
+
+    dfl_time_list_per_round = []
+    dfl_time_list_per_5round = []
+    efficiency_list = []
+    for i in range(len(dfl_time)):
+        dfl_time_list_per_round.append(np.sum(dfl_time.iloc[: i+1].values))
+        efficiency_list.append(num_samples[i]*3 / np.sum(dfl_time.iloc[i].values))
+        if i % 5 == 0:
+            dfl_time_list_per_5round.append(np.sum(dfl_time.iloc[: i+5].values))
+
+    rounds = np.arange(1, 101)
+    accuracy_rounds = np.arange(5, 101, 5)
+    fig, ax1 = plt.subplots(figsize=(10, 5))
+
+    # 绘制efficiency
+    ax1.plot(rounds, efficiency_list, color='teal', label='Efficiency', linestyle='--')
+    ax1.fill_between(rounds, efficiency_list, color='teal', alpha=0.2)
+    ax1.set_xlabel('Round')
+    ax1.set_ylabel('Efficiency(samples/s)')
+    ax1.tick_params(axis='y')
+    ax1.set_ylim(0, 200)
+
+    # 绘制accuracy
+    ax2 = ax1.twinx()
+    ax2.plot(accuracy_rounds, accuracy, color='darkred', label='Accuracy', marker='o')
+    ax2.set_ylabel("Accuracy")
+    ax2.tick_params(axis='y')
+    ax2.set_ylim(0, 0.8)
+
+    ax1.annotate('drop 1 raspi', xy=(25, efficiency_list[24]), xytext=(25, efficiency_list[24]-30),
+                 arrowprops=dict(arrowstyle='-|>', facecolor='black', linewidth=2),
+                 ha='center', va='top')
+    ax1.annotate('drop 1 jsn', xy=(50, efficiency_list[49]), xytext=(50, efficiency_list[49]-30),
+                 arrowprops=dict(arrowstyle='-|>', facecolor='black', linewidth=2),
+                 ha='center', va='top')
+    ax1.annotate('drop 1 raspi', xy=(60, efficiency_list[59]), xytext=(60, efficiency_list[59]-30),
+                 arrowprops=dict(arrowstyle='-|>', facecolor='black', linewidth=2),
+                 ha='center', va='top')
+    ax1.annotate('drop 1 jsn', xy=(75, efficiency_list[74]), xytext=(75, efficiency_list[74]-30),
+                 arrowprops=dict(arrowstyle='-|>', facecolor='black', linewidth=2),
+                 ha='center', va='top')
+    ax1.annotate('drop 2 raspi', xy=(90, efficiency_list[89]), xytext=(90, efficiency_list[89]-30),
+                 arrowprops=dict(arrowstyle='-|>', facecolor='black', linewidth=2),
+                 ha='center', va='top')
+
+    fig.legend(loc='lower right', bbox_to_anchor=(0.9, 0.1))
+
+    plt.title('Accuracy and Efficiency vs Round')
+    # plt.grid(True)
+    plt.show()
+
+
 if __name__ == '__main__':
     # result = exp1_visualization_single('10-10R')
     # result = exp1_visualization_all()
-    exp2_visualization()
+    # exp2_visualization()
+
+    result = exp1_visualization_all()
+
